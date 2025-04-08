@@ -5,7 +5,7 @@ from datetime import datetime, timezone, timedelta
 from pymongo import MongoClient
 
 # MongoDB Connection
-MONGODB_URI = "mongodb+srv://alertdb:NzRoML9MhR3sSKjM@cluster0.iittg.mongodb.net/bitget10K"
+MONGODB_URI = "mongodb://localhost:27017/bitget10K"
 client = MongoClient(MONGODB_URI)
 db = client["bitget10K"]
 
@@ -17,7 +17,7 @@ TOKENS = ["ETHUSDT", "ADAUSDT"]
 INTERVAL = "1min"
 LIMIT = 200  # Max per request
 TOTAL_RECORDS = 10000  # Maintain only the latest XXXX records per token
-SLEEP_TIME = 2  # Sleep to avoid rate limits
+SLEEP_TIME = 1  # Sleep to avoid rate limits
 
 def create_time_series_collection():
     """Create time series collections for each token if they don't exist."""
@@ -146,7 +146,7 @@ def fill_gaps():
             print(f"No gaps to fill for {token}.")
             continue
         
-        total_minutes = (now_ms - gap_start) // 60000
+        total_minutes = (now_ms - gap_start) // 60000 - 1
         print(f"total mins {total_minutes}")
         
         fetched = 0
@@ -155,7 +155,7 @@ def fill_gaps():
         while fetched < total_minutes & total_minutes > 0:
             remaining = total_minutes - fetched
             limit = min(LIMIT, remaining)
-            price_data = fetch_price_data(token, end_time_ms, limit)
+            price_data = fetch_price_data(token, end_time_ms - 60000, limit)
             print(f"fill gap price_data {limit}")
             
             save_to_mongodb(collection, price_data, token)
@@ -182,12 +182,12 @@ def live_update():
             prev_min = datetime.now(timezone.utc).replace(second=0, microsecond=0)
             end_time = int(prev_min.timestamp() * 1000)
             
-            price_data = fetch_price_data(token, end_time, 1)
+            price_data = fetch_price_data(token, end_time - 60000, 1)
             retries = 0
             while not price_data and retries < 3:
                 print(f"Retrying {token} at {prev_min}...")
                 time.sleep(2)
-                price_data = fetch_price_data(token, end_time, 1)
+                price_data = fetch_price_data(token, end_time - 60000, 1)
                 retries += 1
             
             if price_data:
